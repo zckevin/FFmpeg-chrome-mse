@@ -1216,16 +1216,16 @@ static int mov_write_audio_tag(AVFormatContext *s, AVIOContext *pb, MOVMuxContex
             avio_wb16(pb, 0); /* Reserved */
     }
 
-    if (version == 1) { /* SoundDescription V1 extended info */
-        if (mov_pcm_le_gt16(track->par->codec_id) ||
-            mov_pcm_be_gt16(track->par->codec_id))
-            avio_wb32(pb, 1); /*  must be 1 for  uncompressed formats */
-        else
-            avio_wb32(pb, track->par->frame_size); /* Samples per packet */
-        avio_wb32(pb, track->sample_size / track->par->channels); /* Bytes per packet */
-        avio_wb32(pb, track->sample_size); /* Bytes per frame */
-        avio_wb32(pb, 2); /* Bytes per sample */
-    }
+    // if (version == 1) { /* SoundDescription V1 extended info */
+    //     if (mov_pcm_le_gt16(track->par->codec_id) ||
+    //         mov_pcm_be_gt16(track->par->codec_id))
+    //         avio_wb32(pb, 1); /*  must be 1 for  uncompressed formats */
+    //     else
+    //         avio_wb32(pb, track->par->frame_size); /* Samples per packet */
+    //     avio_wb32(pb, track->sample_size / track->par->channels); /* Bytes per packet */
+    //     avio_wb32(pb, track->sample_size); /* Bytes per frame */
+    //     avio_wb32(pb, 2); /* Bytes per sample */
+    // }
 
     if (track->mode == MODE_MOV &&
         (track->par->codec_id == AV_CODEC_ID_AAC           ||
@@ -1238,7 +1238,8 @@ static int mov_write_audio_tag(AVFormatContext *s, AVIOContext *pb, MOVMuxContex
          track->par->codec_id == AV_CODEC_ID_QDM2          ||
          (mov_pcm_le_gt16(track->par->codec_id) && version==1) ||
          (mov_pcm_be_gt16(track->par->codec_id) && version==1)))
-        ret = mov_write_wave_tag(s, pb, track);
+        // ret = mov_write_wave_tag(s, pb, track);
+        ret = mov_write_esds_tag(pb, track);
     else if (track->tag == MKTAG('m','p','4','a'))
         ret = mov_write_esds_tag(pb, track);
     else if (track->par->codec_id == AV_CODEC_ID_AMR_NB)
