@@ -106,6 +106,8 @@
 
 #include "libavutil/avassert.h"
 
+#include "wasm.h"
+
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
 
@@ -4795,6 +4797,16 @@ static int transcode(void)
         goto fail;
 #endif
 
+    if (!wasm_flag_meta_info_reported) {
+      for (int i = 0; i < nb_input_streams; i++) {
+        if (input_streams[i]->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+          wasm_report_stream_info(input_files[0]->ctx, input_streams[i]->st);
+          wasm_flag_meta_info_reported = 1;
+          break;
+        }
+      }
+    }
+
     while (!received_sigterm) {
         int64_t cur_time= av_gettime_relative();
 
@@ -4963,6 +4975,12 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
+EMSCRIPTEN_KEEPALIVE
+int add_js_callback(WasmJSCallback cb) {
+  wasm_g_js_callback = cb;
+  return 0;
+}
+
 int main(int argc, char **argv)
 {
     int i, ret;
@@ -5034,3 +5052,4 @@ int main(int argc, char **argv)
     exit_program(received_nb_signals ? 255 : main_return_code);
     return main_return_code;
 }
+
