@@ -50,6 +50,10 @@ ARGS=(
   -s ALLOW_TABLE_GROWTH=1     # for Module.addFunction()
 
   -s EXIT_RUNTIME=1
+
+  -s 'ASYNCIFY_IMPORTS=["wait_readable"]'
+  -s ASYNCIFY
+  --js-library ./lib.js
 )
 
 emcc -v "${ARGS[@]}"

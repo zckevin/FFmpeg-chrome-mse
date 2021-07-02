@@ -38,6 +38,8 @@
 #include "os_support.h"
 #include "url.h"
 
+#include <emscripten.h>
+
 /* Some systems may not have S_ISFIFO */
 #ifndef S_ISFIFO
 #  ifdef S_IFIFO
@@ -106,11 +108,21 @@ static const AVClass pipe_class = {
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
+extern int wait_readable(void);
+
 static int file_read(URLContext *h, unsigned char *buf, int size)
 {
     FileContext *c = h->priv_data;
     int ret;
     size = FFMIN(size, c->blocksize);
+    // signal read position and size
+    ret = read(c->fd, buf, size);
+    printf("before wait, read %d\n", ret);
+    if (wait_readable() == 0) {
+        // Quit ffmpeg if the processing is canceled.
+        emscripten_force_exit(0);
+    }
+    printf("after wait \n");
     ret = read(c->fd, buf, size);
     if (ret == 0 && c->follow)
         return AVERROR(EAGAIN);

@@ -62,6 +62,8 @@
 #include <windows.h>
 #endif
 
+#include <emscripten.h>
+
 static int init_report(const char *env);
 
 AVDictionary *sws_dict;
@@ -135,6 +137,7 @@ void exit_program(int ret)
         program_exit(ret);
 
     exit(ret);
+    // emscripten_force_exit(ret);
 }
 
 double parse_number_or_die(const char *context, const char *numstr, int type,
