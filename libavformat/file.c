@@ -238,7 +238,8 @@ static int file_open(URLContext *h, const char *filename, int flags)
     /* Buffer writes more than the default 32k to improve throughput especially
      * with networked file systems */
     if (!h->is_streamed && flags & AVIO_FLAG_WRITE)
-        h->min_packet_size = h->max_packet_size = 262144;
+        h->min_packet_size = h->max_packet_size = 1048576;
+        // h->min_packet_size = h->max_packet_size = 262144;
 
     if (c->seekable >= 0)
         h->is_streamed = !c->seekable;

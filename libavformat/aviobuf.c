@@ -33,7 +33,10 @@
 #include "url.h"
 #include <stdarg.h>
 
-#define IO_BUFFER_SIZE 32768
+// in case of backward fseek for updating emitted atom's length
+// create a larger buf...
+// #define IO_BUFFER_SIZE 32768
+#define IO_BUFFER_SIZE 1048576
 
 /**
  * Do seeks within this distance ahead of the current buffer by skipping
@@ -917,6 +920,7 @@ int ffio_fdopen(AVIOContext **s, URLContext *h)
             return AVERROR(EINVAL);
         buffer_size *= 2;
     }
+    printf("zcsb buffer_size %d\n", buffer_size);
     buffer = av_malloc(buffer_size);
     if (!buffer)
         return AVERROR(ENOMEM);
