@@ -1998,7 +1998,8 @@ static int mov_write_colr_tag(AVIOContext *pb, MOVTrack *track, int prefer_icc)
 
     avio_wb32(pb, 0); /* size */
     ffio_wfourcc(pb, "colr");
-    if (track->mode == MODE_MP4)
+    // chrome mse only supports nclx
+    if (1 || track->mode == MODE_MP4)
         ffio_wfourcc(pb, "nclx");
     else
         ffio_wfourcc(pb, "nclc");
@@ -2008,7 +2009,8 @@ static int mov_write_colr_tag(AVIOContext *pb, MOVTrack *track, int prefer_icc)
     avio_wb16(pb, track->par->color_primaries);
     avio_wb16(pb, track->par->color_trc);
     avio_wb16(pb, track->par->color_space);
-    if (track->mode == MODE_MP4) {
+    // chrome mse only supports nclx
+    if (1 || track->mode == MODE_MP4) {
         int full_range = track->par->color_range == AVCOL_RANGE_JPEG;
         avio_w8(pb, full_range << 7);
     }
