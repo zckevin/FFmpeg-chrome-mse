@@ -43,7 +43,7 @@ ARGS=(
   -s 'EXPORTED_RUNTIME_METHODS=["FS", "ccall", "cwrap", "writeAsciiToMemory", "setValue", "lengthBytesUTF8", "stringToUTF8", "UTF8ToString", "addFunction", "allocate", "intArrayFromString", "ALLOC_NORMAL"]'
 
   # --preload-file assets
-  -s INITIAL_MEMORY=33554432      # 33554432 bytes = 32 MB
+  -s INITIAL_MEMORY=134217728      # 33554432 bytes = 128 MB
   # -s ALLOW_MEMORY_GROWTH=1
   -gsource-map --source-map-base /
 
@@ -53,6 +53,7 @@ ARGS=(
 
   -s 'ASYNCIFY_IMPORTS=["wait_readable"]'
   -s ASYNCIFY
+  -s ASYNCIFY_STACK_SIZE=300000
   --js-library ./lib.js
 )
 
