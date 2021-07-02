@@ -1264,19 +1264,19 @@ static int mov_write_audio_tag(AVFormatContext *s, AVIOContext *pb, MOVMuxContex
     if (ret < 0)
         return ret;
 
-    if (track->mode == MODE_MOV && track->par->codec_type == AVMEDIA_TYPE_AUDIO
-            && ((ret = mov_write_chan_tag(s, pb, track)) < 0)) {
-        return ret;
-    }
+    // if (track->mode == MODE_MOV && track->par->codec_type == AVMEDIA_TYPE_AUDIO
+    //         && ((ret = mov_write_chan_tag(s, pb, track)) < 0)) {
+    //     return ret;
+    // }
 
-    if (mov->encryption_scheme != MOV_ENC_NONE
-            && ((ret = ff_mov_cenc_write_sinf_tag(track, pb, mov->encryption_kid)) < 0)) {
-        return ret;
-    }
+    // if (mov->encryption_scheme != MOV_ENC_NONE
+    //         && ((ret = ff_mov_cenc_write_sinf_tag(track, pb, mov->encryption_kid)) < 0)) {
+    //     return ret;
+    // }
 
-    if (track->mode == MODE_MP4 &&
-            ((ret = mov_write_btrt_tag(pb, track)) < 0))
-        return ret;
+    // if (track->mode == MODE_MP4 &&
+    //         ((ret = mov_write_btrt_tag(pb, track)) < 0))
+    //     return ret;
 
     ret = update_size(pb, pos);
     return ret;
@@ -2199,8 +2199,8 @@ static int mov_write_video_tag(AVFormatContext *s, AVIOContext *pb, MOVMuxContex
         mov_write_hvcc_tag(pb, track);
     else if (track->par->codec_id == AV_CODEC_ID_H264 && !TAG_IS_AVCI(track->tag)) {
         mov_write_avcc_tag(pb, track);
-        if (track->mode == MODE_IPOD)
-            mov_write_uuid_tag_ipod(pb);
+        // if (track->mode == MODE_IPOD)
+        //     mov_write_uuid_tag_ipod(pb);
     } else if (track->par->codec_id == AV_CODEC_ID_VP9) {
         mov_write_vpcc_tag(mov->fc, pb, track);
     } else if (track->par->codec_id == AV_CODEC_ID_AV1) {
@@ -2217,72 +2217,74 @@ static int mov_write_video_tag(AVFormatContext *s, AVIOContext *pb, MOVMuxContex
     } else if (track->vos_len > 0)
         mov_write_glbl_tag(pb, track);
 
-    if (track->par->codec_id != AV_CODEC_ID_H264 &&
-        track->par->codec_id != AV_CODEC_ID_MPEG4 &&
-        track->par->codec_id != AV_CODEC_ID_DNXHD) {
-        int field_order = track->par->field_order;
+    // disable these features for Chrome MSE
+    // refer: https://github.com/bilibili/flv.js/blob/6924c82e9fcb607e0aed6d5002e2e01ecf9d438c/src/remux/mp4-generator.js
+    // if (track->par->codec_id != AV_CODEC_ID_H264 &&
+    //     track->par->codec_id != AV_CODEC_ID_MPEG4 &&
+    //     track->par->codec_id != AV_CODEC_ID_DNXHD) {
+    //     int field_order = track->par->field_order;
 
-        if (field_order != AV_FIELD_UNKNOWN)
-            mov_write_fiel_tag(pb, track, field_order);
-    }
+    //     if (field_order != AV_FIELD_UNKNOWN)
+    //         mov_write_fiel_tag(pb, track, field_order);
+    // }
 
-    if (mov->flags & FF_MOV_FLAG_WRITE_GAMA) {
-        if (track->mode == MODE_MOV)
-            mov_write_gama_tag(s, pb, track, mov->gamma);
-        else
-            av_log(mov->fc, AV_LOG_WARNING, "Not writing 'gama' atom. Format is not MOV.\n");
-    }
-    if (track->mode == MODE_MOV || track->mode == MODE_MP4) {
-        int has_color_info = track->par->color_primaries != AVCOL_PRI_UNSPECIFIED &&
-                             track->par->color_trc != AVCOL_TRC_UNSPECIFIED &&
-                             track->par->color_space != AVCOL_SPC_UNSPECIFIED;
-        if (has_color_info || mov->flags & FF_MOV_FLAG_WRITE_COLR ||
-            av_stream_get_side_data(track->st, AV_PKT_DATA_ICC_PROFILE, NULL)) {
-            int prefer_icc = mov->flags & FF_MOV_FLAG_PREFER_ICC || !has_color_info;
-            mov_write_colr_tag(pb, track, prefer_icc);
-        } else if (mov->flags & FF_MOV_FLAG_WRITE_COLR) {
-             av_log(mov->fc, AV_LOG_WARNING, "Not writing 'colr' atom. Format is not MOV or MP4.\n");
-        }
-    }
-    if (track->mode == MODE_MOV || track->mode == MODE_MP4) {
-        mov_write_clli_tag(pb, track);
-        mov_write_mdcv_tag(pb, track);
-    }
+    // if (mov->flags & FF_MOV_FLAG_WRITE_GAMA) {
+    //     if (track->mode == MODE_MOV)
+    //         mov_write_gama_tag(s, pb, track, mov->gamma);
+    //     else
+    //         av_log(mov->fc, AV_LOG_WARNING, "Not writing 'gama' atom. Format is not MOV.\n");
+    // }
+    // if (track->mode == MODE_MOV || track->mode == MODE_MP4) {
+    //     int has_color_info = track->par->color_primaries != AVCOL_PRI_UNSPECIFIED &&
+    //                          track->par->color_trc != AVCOL_TRC_UNSPECIFIED &&
+    //                          track->par->color_space != AVCOL_SPC_UNSPECIFIED;
+    //     if (has_color_info || mov->flags & FF_MOV_FLAG_WRITE_COLR ||
+    //         av_stream_get_side_data(track->st, AV_PKT_DATA_ICC_PROFILE, NULL)) {
+    //         int prefer_icc = mov->flags & FF_MOV_FLAG_PREFER_ICC || !has_color_info;
+    //         mov_write_colr_tag(pb, track, prefer_icc);
+    //     } else if (mov->flags & FF_MOV_FLAG_WRITE_COLR) {
+    //          av_log(mov->fc, AV_LOG_WARNING, "Not writing 'colr' atom. Format is not MOV or MP4.\n");
+    //     }
+    // }
+    // if (track->mode == MODE_MOV || track->mode == MODE_MP4) {
+    //     mov_write_clli_tag(pb, track);
+    //     mov_write_mdcv_tag(pb, track);
+    // }
 
-    if (track->mode == MODE_MP4 && mov->fc->strict_std_compliance <= FF_COMPLIANCE_UNOFFICIAL) {
-        AVStereo3D* stereo_3d = (AVStereo3D*) av_stream_get_side_data(track->st, AV_PKT_DATA_STEREO3D, NULL);
-        AVSphericalMapping* spherical_mapping = (AVSphericalMapping*)av_stream_get_side_data(track->st, AV_PKT_DATA_SPHERICAL, NULL);
-        AVDOVIDecoderConfigurationRecord *dovi = (AVDOVIDecoderConfigurationRecord *)
-                                                 av_stream_get_side_data(track->st, AV_PKT_DATA_DOVI_CONF, NULL);
+    // if (track->mode == MODE_MP4 && mov->fc->strict_std_compliance <= FF_COMPLIANCE_UNOFFICIAL) {
+    //     AVStereo3D* stereo_3d = (AVStereo3D*) av_stream_get_side_data(track->st, AV_PKT_DATA_STEREO3D, NULL);
+    //     AVSphericalMapping* spherical_mapping = (AVSphericalMapping*)av_stream_get_side_data(track->st, AV_PKT_DATA_SPHERICAL, NULL);
+    //     AVDOVIDecoderConfigurationRecord *dovi = (AVDOVIDecoderConfigurationRecord *)
+    //                                              av_stream_get_side_data(track->st, AV_PKT_DATA_DOVI_CONF, NULL);
 
-        if (stereo_3d)
-            mov_write_st3d_tag(s, pb, stereo_3d);
-        if (spherical_mapping)
-            mov_write_sv3d_tag(mov->fc, pb, spherical_mapping);
-        if (dovi)
-            mov_write_dvcc_dvvc_tag(s, pb, dovi);
-    }
+    //     if (stereo_3d)
+    //         mov_write_st3d_tag(s, pb, stereo_3d);
+    //     if (spherical_mapping)
+    //         mov_write_sv3d_tag(mov->fc, pb, spherical_mapping);
+    //     if (dovi)
+    //         mov_write_dvcc_dvvc_tag(s, pb, dovi);
+    // }
 
-    if (track->par->sample_aspect_ratio.den && track->par->sample_aspect_ratio.num) {
-        mov_write_pasp_tag(pb, track);
-    }
+    // if (track->par->sample_aspect_ratio.den && track->par->sample_aspect_ratio.num) {
+    //     mov_write_pasp_tag(pb, track);
+    // }
 
-    if (uncompressed_ycbcr){
-        mov_write_clap_tag(pb, track);
-    }
+    // if (uncompressed_ycbcr){
+    //     mov_write_clap_tag(pb, track);
+    // }
 
-    if (mov->encryption_scheme != MOV_ENC_NONE) {
-        ff_mov_cenc_write_sinf_tag(track, pb, mov->encryption_kid);
-    }
+    // if (mov->encryption_scheme != MOV_ENC_NONE) {
+    //     ff_mov_cenc_write_sinf_tag(track, pb, mov->encryption_kid);
+    // }
 
-    if (track->mode == MODE_MP4 &&
-            ((ret = mov_write_btrt_tag(pb, track)) < 0))
-        return ret;
+    // if (track->mode == MODE_MP4 &&
+    //         ((ret = mov_write_btrt_tag(pb, track)) < 0))
+    //     return ret;
 
-    /* extra padding for avid stsd */
-    /* https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html#//apple_ref/doc/uid/TP40000939-CH204-61112 */
-    if (avid)
-        avio_wb32(pb, 0);
+    // /* extra padding for avid stsd */
+    // /* https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html#//apple_ref/doc/uid/TP40000939-CH204-61112 */
+    // if (avid)
+    //     avio_wb32(pb, 0);
 
     return update_size(pb, pos);
 }
