@@ -235,6 +235,14 @@ void avio_write(AVIOContext *s, const unsigned char *buf, int size)
     }
 }
 
+void avio_reset(AVIOContext *s)
+{
+    if (!s->write_flag) {
+        return;
+    }
+    s->buf_ptr = s->buf_ptr_max = s->buffer;
+}
+
 void avio_flush(AVIOContext *s)
 {
     int seekback = s->write_flag ? FFMIN(0, s->buf_ptr - s->buf_ptr_max) : 0;

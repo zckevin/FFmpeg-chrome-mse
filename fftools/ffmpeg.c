@@ -4337,6 +4337,14 @@ static int seek_to_start(InputFile *ifile, AVFormatContext *is)
     return ret;
 }
 
+extern int wasm_pause_decode(double pkt_pts_seconds, int at_eof);
+
+static double wasm_seek_target = -1;
+
+int wasm_almost_equal(double a, double b) {
+    return FFABS(a-b) < 0.001;
+}
+
 /*
  * Return
  * - 0 -- one packet was read and processed
@@ -4354,6 +4362,7 @@ static int process_input(int file_index)
     int64_t duration;
     int64_t pkt_dts;
     int disable_discontinuity_correction = copy_ts;
+    static int wasm_pause_counter = 0;
 
     is  = ifile->ctx;
     ret = get_input_packet(ifile, &pkt);
@@ -4615,6 +4624,30 @@ static int process_input(int file_index)
                av_ts2timestr(input_files[ist->file_index]->ts_offset, &AV_TIME_BASE_Q));
     }
 
+    if (ist->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (!wasm_almost_equal(wasm_seek_target, -1)) {
+            int64_t target_number = (int64_t)wasm_seek_target;
+            int64_t target_decimal = (int64_t)((wasm_seek_target - (double)target_number) * 10);
+
+            // int64_t seek_target_ts = av_rescale_q(target_number, ist->st->time_base, AV_TIME_BASE_Q) +
+            //     av_rescale_q(target_decimal, ist->st->time_base, AV_TIME_BASE_Q) / 10;
+             int64_t seek_target_ts = av_rescale_q(target_number *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) +
+                av_rescale_q(target_decimal *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) / 10;
+            // int64_t seek_target_ts = target_number * AV_TIME_BASE +
+            //         target_decimal * AV_TIME_BASE / 10;
+
+            // ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, 0);
+            ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, AVSEEK_FLAG_BACKWARD);
+            printf("avformat_seek to %f ret: %d\n", wasm_seek_target, ret);
+            wasm_seek_target = -1;
+            return 0;
+        }
+        if (++wasm_pause_counter >= 10) {
+            wasm_pause_counter = 0;
+            wasm_pause_decode(pkt->pts * av_q2d(ist->st->time_base), 0);
+        }
+    }
+
     sub2video_heartbeat(ist, pkt->pts);
 
     process_input_packet(ist, pkt, 0);
@@ -4781,6 +4814,7 @@ static int transcode(void)
     InputStream *ist;
     int64_t timer_start;
     int64_t total_packets_written = 0;
+    int wasm_met_eof = 0;
 
     ret = transcode_init();
     if (ret < 0)
@@ -4807,6 +4841,7 @@ static int transcode(void)
       }
     }
 
+transcode_loop:
     while (!received_sigterm) {
         int64_t cur_time= av_gettime_relative();
 
@@ -4816,7 +4851,7 @@ static int transcode(void)
                 break;
 
         /* check if there's any stream where output is still needed */
-        if (!need_output()) {
+        if (!need_output() && !wasm_met_eof) {
             av_log(NULL, AV_LOG_VERBOSE, "No more output streams to write to, finishing.\n");
             break;
         }
@@ -4831,7 +4866,7 @@ static int transcode(void)
         print_report(0, timer_start, cur_time);
     }
 #if HAVE_THREADS
-    free_input_threads();
+    // free_input_threads();
 #endif
 
     /* at the end of stream, we must flush the decoder buffers */
@@ -4843,7 +4878,7 @@ static int transcode(void)
     }
     flush_encoders();
 
-    term_exit();
+    // term_exit();
 
     /* write the trailer if needed and close file */
     for (i = 0; i < nb_output_files; i++) {
@@ -4857,10 +4892,13 @@ static int transcode(void)
         }
         if ((ret = av_write_trailer(os)) < 0) {
             av_log(NULL, AV_LOG_ERROR, "Error writing trailer of %s: %s\n", os->url, av_err2str(ret));
-            if (exit_on_error)
-                exit_program(1);
+            // if (exit_on_error)
+            //     exit_program(1);
         }
     }
+    wasm_pause_decode(0, 1);
+    wasm_met_eof = 1;
+    goto transcode_loop;
 
     /* dump report by using the first video and audio streams */
     print_report(1, timer_start, av_gettime_relative());
@@ -4977,8 +5015,14 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 
 EMSCRIPTEN_KEEPALIVE
 int add_js_callback(WasmJSCallback cb) {
-  wasm_g_js_callback = cb;
-  return 0;
+    wasm_g_js_callback = cb;
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int wasm_do_seek(double target) {
+    wasm_seek_target = target;
+    return 0;
 }
 
 int main(int argc, char **argv)

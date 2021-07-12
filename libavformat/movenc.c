@@ -5936,6 +5936,12 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
              trk->entry && pkt->flags & AV_PKT_FLAG_KEY) ||
             (mov->flags & FF_MOV_FLAG_FRAG_EVERY_FRAME)) {
         if (frag_duration >= mov->min_fragment_duration) {
+            int should_flush = 1;
+            if (trk->end_pts != pkt->pts) {
+                printf("seeked from %d -> %d\n", trk->end_pts, pkt->pts);
+                avio_reset(s->pb);
+                should_flush = 0;
+            }
             // Set the duration of this track to line up with the next
             // sample in this track. This avoids relying on AVPacket
             // duration, but only helps for this particular track, not
@@ -5946,7 +5952,8 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
             else
                 trk->end_pts = pkt->dts;
             trk->end_reliable = 1;
-            mov_auto_flush_fragment(s, 0);
+            if (should_flush)
+                mov_auto_flush_fragment(s, 0);
         }
     }
 

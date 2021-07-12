@@ -587,6 +587,8 @@ void avio_print_string_array(AVIOContext *s, const char *strings[]);
  */
 void avio_flush(AVIOContext *s);
 
+void avio_reset(AVIOContext *s);
+
 /**
  * Read size bytes from AVIOContext into buf.
  * @return number of bytes read or AVERROR

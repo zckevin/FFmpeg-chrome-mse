@@ -108,7 +108,7 @@ static const AVClass pipe_class = {
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
-extern int wait_readable(void);
+extern int wasm_wait_readable(void);
 
 static int file_read(URLContext *h, unsigned char *buf, int size)
 {
@@ -117,13 +117,16 @@ static int file_read(URLContext *h, unsigned char *buf, int size)
     size = FFMIN(size, c->blocksize);
     // signal read position and size
     ret = read(c->fd, buf, size);
-    printf("before wait, read %d\n", ret);
-    if (wait_readable() == 0) {
-        // Quit ffmpeg if the processing is canceled.
-        emscripten_force_exit(0);
+    // do read again...
+    if (ret == 0) {
+      printf("before wait, read %d\n", ret);
+      if (wasm_wait_readable() == 0) {
+          // Quit ffmpeg if the processing is canceled.
+          emscripten_force_exit(0);
+      }
+      printf("after wait \n");
+      ret = read(c->fd, buf, size);
     }
-    printf("after wait \n");
-    ret = read(c->fd, buf, size);
     if (ret == 0 && c->follow)
         return AVERROR(EAGAIN);
     if (ret == 0)
