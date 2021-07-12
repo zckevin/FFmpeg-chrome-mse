@@ -587,6 +587,9 @@ void avio_print_string_array(AVIOContext *s, const char *strings[]);
  */
 void avio_flush(AVIOContext *s);
 
+/**
+ * Clear all buffered data.
+ */
 void avio_reset(AVIOContext *s);
 
 /**

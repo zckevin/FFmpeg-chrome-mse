@@ -4629,16 +4629,10 @@ static int process_input(int file_index)
             int64_t target_number = (int64_t)wasm_seek_target;
             int64_t target_decimal = (int64_t)((wasm_seek_target - (double)target_number) * 10);
 
-            // int64_t seek_target_ts = av_rescale_q(target_number, ist->st->time_base, AV_TIME_BASE_Q) +
-            //     av_rescale_q(target_decimal, ist->st->time_base, AV_TIME_BASE_Q) / 10;
-             int64_t seek_target_ts = av_rescale_q(target_number *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) +
+            int64_t seek_target_ts = av_rescale_q(target_number *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) +
                 av_rescale_q(target_decimal *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) / 10;
-            // int64_t seek_target_ts = target_number * AV_TIME_BASE +
-            //         target_decimal * AV_TIME_BASE / 10;
-
-            // ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, 0);
             ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, AVSEEK_FLAG_BACKWARD);
-            printf("avformat_seek to %f ret: %d\n", wasm_seek_target, ret);
+            printf("avformat_seek to seconds %f ret: %d\n", wasm_seek_target, ret);
             wasm_seek_target = -1;
             return 0;
         }

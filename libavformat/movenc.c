@@ -5937,8 +5937,10 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
             (mov->flags & FF_MOV_FLAG_FRAG_EVERY_FRAME)) {
         if (frag_duration >= mov->min_fragment_duration) {
             int should_flush = 1;
+            // non-continued pts means seeking just happened,
+            // and we should clear/reset buffered frames in mdat on seeking.
             if (trk->end_pts != pkt->pts) {
-                printf("seeked from %d -> %d\n", trk->end_pts, pkt->pts);
+                printf("seeked from pts %d -> %d\n", trk->end_pts, pkt->pts);
                 avio_reset(s->pb);
                 should_flush = 0;
             }
