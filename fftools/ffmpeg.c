@@ -108,6 +108,8 @@
 
 #include "wasm.h"
 
+extern WasmGlobalConfig *wasm_config;
+
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
 
@@ -4337,14 +4339,6 @@ static int seek_to_start(InputFile *ifile, AVFormatContext *is)
     return ret;
 }
 
-extern int wasm_pause_decode(double pkt_pts_seconds, int at_eof);
-
-static double wasm_seek_target = -1;
-
-int wasm_almost_equal(double a, double b) {
-    return FFABS(a-b) < 0.001;
-}
-
 /*
  * Return
  * - 0 -- one packet was read and processed
@@ -4624,21 +4618,19 @@ static int process_input(int file_index)
                av_ts2timestr(input_files[ist->file_index]->ts_offset, &AV_TIME_BASE_Q));
     }
 
+    /**
+     * I donnt know why, but wasm_initial_seek has to be put here,
+     * intead of transcode_second_part or other funcs...
+     */
     if (ist->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-        if (!wasm_almost_equal(wasm_seek_target, -1)) {
-            int64_t target_number = (int64_t)wasm_seek_target;
-            int64_t target_decimal = (int64_t)((wasm_seek_target - (double)target_number) * 10);
+        wasm_initial_seek(ist, is);
 
-            int64_t seek_target_ts = av_rescale_q(target_number *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) +
-                av_rescale_q(target_decimal *AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) / 10;
-            ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, AVSEEK_FLAG_BACKWARD);
-            printf("avformat_seek to seconds %f ret: %d\n", wasm_seek_target, ret);
-            wasm_seek_target = -1;
-            return 0;
-        }
         if (++wasm_pause_counter >= 10) {
             wasm_pause_counter = 0;
-            wasm_pause_decode(pkt->pts * av_q2d(ist->st->time_base), 0);
+            if (wasm_pause_decode(pkt->pts * av_q2d(ist->st->time_base), 0)) {
+              printf("seeking back, exit program\n");
+              exit_program(1);
+            }
         }
     }
 
@@ -4800,7 +4792,8 @@ static int transcode_step(void)
 /*
  * The following code is the main loop of the file converter
  */
-static int transcode(void)
+EMSCRIPTEN_KEEPALIVE
+int transcode_second_part(void)
 {
     int ret, i;
     AVFormatContext *os;
@@ -4810,9 +4803,39 @@ static int transcode(void)
     int64_t total_packets_written = 0;
     int wasm_met_eof = 0;
 
-    ret = transcode_init();
-    if (ret < 0)
-        goto fail;
+    // moved to transcode_first_part()
+    // 
+    // ret = transcode_init();
+    // if (ret < 0)
+    //     goto fail;
+
+    // see comments in process_input()
+    /*
+    {
+        InputFile *ifile;
+        AVFormatContext *is;
+        int i;
+
+        for (i = 0; i < nb_input_streams; i++) {
+            ist = input_streams[i];
+
+            if (ist->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                ifile = input_files[ist->file_index];
+                is = ifile->ctx;
+                wasm_initial_seek(ist, is);
+                break;
+            }
+        }
+    }
+    */
+
+    // hook up wasm report function to be used in movenc.c
+    for (i = 0; i < nb_output_files; i++) {
+        os = output_files[i]->ctx;
+        // os->wasm_config = wasm_config;
+        os->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
+        os = NULL;
+    }
 
     if (stdin_interaction) {
         av_log(NULL, AV_LOG_INFO, "Press [q] to stop, [?] for help\n");
@@ -4824,16 +4847,6 @@ static int transcode(void)
     if ((ret = init_input_threads()) < 0)
         goto fail;
 #endif
-
-    if (!wasm_flag_meta_info_reported) {
-      for (int i = 0; i < nb_input_streams; i++) {
-        if (input_streams[i]->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-          wasm_report_stream_info(input_files[0]->ctx, input_streams[i]->st);
-          wasm_flag_meta_info_reported = 1;
-          break;
-        }
-      }
-    }
 
 transcode_loop:
     while (!received_sigterm) {
@@ -4890,7 +4903,10 @@ transcode_loop:
             //     exit_program(1);
         }
     }
-    wasm_pause_decode(0, 1);
+    if (wasm_pause_decode(0, 1 /* is_eof */)) {
+      printf("seeking back, exit program\n");
+      exit_program(1);
+    }
     wasm_met_eof = 1;
     goto transcode_loop;
 
@@ -4959,6 +4975,29 @@ transcode_loop:
     return ret;
 }
 
+static int transcode_first_part(void)
+{
+  int ret;
+  ret = transcode_init();
+  if (ret < 0) {
+    printf("trancode_init failed!");
+    return ret;
+  }
+
+  if (!wasm_config->flag_meta_info_reported) {
+    for (int i = 0; i < nb_input_streams; i++) {
+      if (input_streams[i]->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        wasm_report_stream_info(input_files[0]->ctx, input_streams[i]->st);
+        wasm_config->flag_meta_info_reported = 1;
+        break;
+      }
+    }
+  }
+
+  wasm_sleep();
+  return transcode_second_part();
+}
+
 static BenchmarkTimeStamps get_benchmark_time_stamps(void)
 {
     BenchmarkTimeStamps time_stamps = { av_gettime_relative() };
@@ -5007,22 +5046,13 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
-EMSCRIPTEN_KEEPALIVE
-int add_js_callback(WasmJSCallback cb) {
-    wasm_g_js_callback = cb;
-    return 0;
-}
-
-EMSCRIPTEN_KEEPALIVE
-int wasm_do_seek(double target) {
-    wasm_seek_target = target;
-    return 0;
-}
-
 int main(int argc, char **argv)
 {
     int i, ret;
     BenchmarkTimeStamps ti;
+
+    wasm_config = malloc(sizeof(WasmGlobalConfig));
+    // wasm_config->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
 
     init_dynload();
 
@@ -5070,7 +5100,7 @@ int main(int argc, char **argv)
     }
 
     current_time = ti = get_benchmark_time_stamps();
-    if (transcode() < 0)
+    if (transcode_first_part() < 0)
         exit_program(1);
     if (do_benchmark) {
         int64_t utime, stime, rtime;

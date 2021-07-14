@@ -4821,16 +4821,38 @@ static int mov_write_prft_tag(AVIOContext *pb, MOVMuxContext *mov, int tracks)
     return update_size(pb, pos);
 }
 
-static int mov_write_moof_tag(AVIOContext *pb, MOVMuxContext *mov, int tracks,
+extern int wasm_msg_callback(const char* msg);
+
+static void wasm_emit_moof_mdat_info(AVFormatContext *s, MOVMuxContext *mov, int64_t moof_size, int64_t mdat_size)
+{
+    // emit moof data point
+    int i;
+    for (i = 0; i < mov->nb_streams; i++) {
+      MOVTrack *track = &mov->tracks[i];
+      if (track->par->codec_type == AVMEDIA_TYPE_VIDEO) {
+        int64_t start_dts = track->frag_start;
+        int64_t end_dts = track->track_duration;
+        printf("emit moof+mdat, dts: %lld-%lld, moof size: %lld, mdat size: %lld\n", start_dts, end_dts, moof_size, mdat_size + 8);
+
+        s->wasm_report_moof_mdat_info(start_dts, end_dts, moof_size, mdat_size + 8);
+        break;
+      }
+    }
+}
+
+static int mov_write_moof_tag(AVFormatContext *s, MOVMuxContext *mov, int tracks,
                               int64_t mdat_size)
 {
     AVIOContext *avio_buf;
     int ret, moof_size;
+    AVIOContext *pb = s->pb;
 
     if ((ret = ffio_open_null_buf(&avio_buf)) < 0)
         return ret;
     mov_write_moof_tag_internal(avio_buf, mov, tracks, 0);
     moof_size = ffio_close_null_buf(avio_buf);
+
+    wasm_emit_moof_mdat_info(s, mov, moof_size, mdat_size);
 
     if (mov->flags & FF_MOV_FLAG_DASH &&
         !(mov->flags & (FF_MOV_FLAG_GLOBAL_SIDX | FF_MOV_FLAG_SKIP_SIDX)))
@@ -5438,7 +5460,7 @@ static int mov_flush_fragment(AVFormatContext *s, int force)
         if (write_moof) {
             avio_write_marker(s->pb, AV_NOPTS_VALUE, AVIO_DATA_MARKER_FLUSH_POINT);
 
-            mov_write_moof_tag(s->pb, mov, moof_tracks, mdat_size);
+            mov_write_moof_tag(s, mov, moof_tracks, mdat_size);
             mov->fragments++;
 
             avio_wb32(s->pb, mdat_size + 8);
@@ -5880,6 +5902,8 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
     if (ret < 0)
         return ret;
 
+    printf("mov_write_single_packet pts: %lld\n", pkt->pts);
+
     if (mov->flags & FF_MOV_FLAG_FRAG_DISCONT) {
         int i;
         for (i = 0; i < s->nb_streams; i++)
@@ -5937,13 +5961,16 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
             (mov->flags & FF_MOV_FLAG_FRAG_EVERY_FRAME)) {
         if (frag_duration >= mov->min_fragment_duration) {
             int should_flush = 1;
-            // non-continued pts means seeking just happened,
-            // and we should clear/reset buffered frames in mdat on seeking.
-            if (trk->end_pts != pkt->pts) {
-                printf("seeked from pts %d -> %d\n", trk->end_pts, pkt->pts);
-                avio_reset(s->pb);
-                should_flush = 0;
-            }
+            // may cause parsing error
+            //
+            // // non-continued pts means seeking (forward) just happened,
+            // // and we should clear/reset buffered frames in mdat on seeking.
+            // if (trk->end_pts != pkt->pts) {
+            //     printf("seeked from pts %d -> %d\n", trk->end_pts, pkt->pts);
+            //     avio_reset(s->pb);
+            //     should_flush = 0;
+            // }
+
             // Set the duration of this track to line up with the next
             // sample in this track. This avoids relying on AVPacket
             // duration, but only helps for this particular track, not

@@ -1082,6 +1082,8 @@ enum AVDurationEstimationMethod {
 
 typedef struct AVFormatInternal AVFormatInternal;
 
+typedef void (*wasm_report_moof_mdat_info_func) (double, double, int, int);
+
 /**
  * Format I/O context.
  * New fields can be added to the end with minor version bumps.
@@ -1696,6 +1698,14 @@ typedef struct AVFormatContext {
      * - decoding: set by user
      */
     int max_probe_packets;
+
+    /**
+     * Initial seeking postion of this process, for wasm
+     */
+    // int64_t seeking_start_seconds;
+
+    // WasmGlobalConfig *wasm_config;
+    wasm_report_moof_mdat_info_func wasm_report_moof_mdat_info;
 } AVFormatContext;
 
 /**
