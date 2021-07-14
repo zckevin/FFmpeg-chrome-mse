@@ -4832,9 +4832,15 @@ static void wasm_emit_moof_mdat_info(AVFormatContext *s, MOVMuxContext *mov, int
       if (track->par->codec_type == AVMEDIA_TYPE_VIDEO) {
         int64_t start_dts = track->frag_start;
         int64_t end_dts = track->track_duration;
-        printf("emit moof+mdat, dts: %lld-%lld, moof size: %lld, mdat size: %lld\n", start_dts, end_dts, moof_size, mdat_size + 8);
 
-        s->wasm_report_moof_mdat_info(start_dts, end_dts, moof_size, mdat_size + 8);
+        double start_seconds = (double)start_dts / (double)track->timescale;
+        double end_seconds = (double)end_dts / (double)track->timescale;
+        printf("emit moof+mdat, dts: %lld-%lld, seconds: %f-%f, moof size: %lld, mdat size: %lld\n",
+            start_dts, end_dts,
+            start_seconds, end_seconds,
+            moof_size, mdat_size + 8);
+
+        s->wasm_report_moof_mdat_info(start_seconds, end_seconds, moof_size, mdat_size + 8);
         break;
       }
     }
@@ -5901,8 +5907,6 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
     int ret = check_pkt(s, pkt);
     if (ret < 0)
         return ret;
-
-    printf("mov_write_single_packet pts: %lld\n", pkt->pts);
 
     if (mov->flags & FF_MOV_FLAG_FRAG_DISCONT) {
         int i;

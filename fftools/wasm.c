@@ -97,7 +97,6 @@ end:
 
 void wasm_report_moof_mdat_info(double from_seconds, double to_seconds, int moof_size, int mdat_size)
 {
-    char buf[512];
     char *result = NULL;
     cJSON *entry;
 
@@ -117,8 +116,7 @@ void wasm_report_moof_mdat_info(double from_seconds, double to_seconds, int moof
 
 end:
     cJSON_Delete(entry);
-    // wasm_msg_callback(result ? result : "{}");
-    wasm_msg_callback("{}");
+    wasm_msg_callback(result ? result : "{}");
 }
 
 int wasm_almost_equal(double a, double b)
@@ -128,7 +126,7 @@ int wasm_almost_equal(double a, double b)
 
 void wasm_initial_seek(InputStream *ist, AVFormatContext *is)
 {
-    if (wasm_config->initial_seeked_done == 1 || wasm_almost_equal(wasm_config->seek_target, -1))
+    if (wasm_config->initial_seeked_done == 1 || wasm_almost_equal(wasm_config->seek_target, 0))
     {
         return;
     }
@@ -139,7 +137,8 @@ void wasm_initial_seek(InputStream *ist, AVFormatContext *is)
 
     int64_t seek_target_ts = av_rescale_q(target_number * AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) +
                              av_rescale_q(target_decimal * AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) / 10;
+
+    wasm_config->initial_seeked_done = 1;
     ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, AVSEEK_FLAG_BACKWARD);
     printf("avformat_seek to seconds %f, ts %lld, ret: %d\n", wasm_config->seek_target, seek_target_ts, ret);
-    wasm_config->initial_seeked_done = 1;
 }

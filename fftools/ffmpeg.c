@@ -4629,7 +4629,8 @@ static int process_input(int file_index)
             wasm_pause_counter = 0;
             if (wasm_pause_decode(pkt->pts * av_q2d(ist->st->time_base), 0)) {
               printf("seeking back, exit program\n");
-              exit_program(1);
+              // abort();
+              exit(1);
             }
         }
     }
@@ -4801,7 +4802,6 @@ int transcode_second_part(void)
     InputStream *ist;
     int64_t timer_start;
     int64_t total_packets_written = 0;
-    int wasm_met_eof = 0;
 
     // moved to transcode_first_part()
     // 
@@ -4858,7 +4858,7 @@ transcode_loop:
                 break;
 
         /* check if there's any stream where output is still needed */
-        if (!need_output() && !wasm_met_eof) {
+        if (!need_output()) {
             av_log(NULL, AV_LOG_VERBOSE, "No more output streams to write to, finishing.\n");
             break;
         }
@@ -4905,10 +4905,12 @@ transcode_loop:
     }
     if (wasm_pause_decode(0, 1 /* is_eof */)) {
       printf("seeking back, exit program\n");
-      exit_program(1);
+      exit(1);
+      // abort();
+      // return 1;
     }
-    wasm_met_eof = 1;
-    goto transcode_loop;
+    exit(1);
+    // goto transcode_loop;
 
     /* dump report by using the first video and audio streams */
     print_report(1, timer_start, av_gettime_relative());

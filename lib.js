@@ -7,11 +7,14 @@ mergeInto(LibraryManager.library, {
   },
 
   wasm_pause_decode: function (...args) {
+    console.log("enter wasm_pause_decode()")
     return Asyncify.handleSleep(function (wakeUp) {
       pauseDecodeIfNeeded((seekingBack) => {
         if (seekingBack) {
-          wakeup(1);
+          console.log("abort wasm_pause_decode()")
+          wakeUp(1);
         } else {
+          console.log("exit wasm_pause_decode()")
           wakeUp(0);
         }
       }, ...args);
