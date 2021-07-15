@@ -36,13 +36,13 @@ ARGS=(
   # -s PTHREAD_POOL_SIZE=4 -s PTHREAD_POOL_SIZE_STRICT=2 
 
   # -s EXPORTED_FUNCTIONS="[_main, _emscripten_proxy_main, _add_js_callback, _wasm_do_seek, _malloc]"  # export main and proxy_main funcs
-  -s EXPORTED_FUNCTIONS="[_main, _wasm_do_seek, _transcode_second_part, _malloc]"  # export main and proxy_main funcs
+  -s EXPORTED_FUNCTIONS="[_main, _wasm_do_seek, _transcode_second_part, _wasm_shutdown, _malloc]"  # export main and proxy_main funcs
   -s INVOKE_RUN=0                               # not to run the main() in the beginning
   -s 'EXPORTED_RUNTIME_METHODS=["FS", "ccall", "cwrap", "writeAsciiToMemory", "setValue", "lengthBytesUTF8", "stringToUTF8", "UTF8ToString", "addFunction", "allocate", "intArrayFromString", "ALLOC_NORMAL"]'
 
   # --preload-file assets
   -s INITIAL_MEMORY=134217728      # 128 MB
-  # -s ALLOW_MEMORY_GROWTH=1
+  -s ALLOW_MEMORY_GROWTH=0
 
   -s ALLOW_TABLE_GROWTH=1     # for Module.addFunction()
 

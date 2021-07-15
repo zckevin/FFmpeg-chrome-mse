@@ -36,7 +36,8 @@
 // in case of backward fseek for updating emitted atom's length
 // create a larger buf...
 // #define IO_BUFFER_SIZE 32768
-#define IO_BUFFER_SIZE 1048576
+#define IO_BUFFER_SIZE 2097152 
+// #define IO_BUFFER_SIZE 5242880
 
 /**
  * Do seeks within this distance ahead of the current buffer by skipping

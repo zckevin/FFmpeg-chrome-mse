@@ -4845,7 +4845,6 @@ int transcode_second_part(void)
     // hook up wasm report function to be used in movenc.c
     for (i = 0; i < nb_output_files; i++) {
         os = output_files[i]->ctx;
-        // os->wasm_config = wasm_config;
         os->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
         os = NULL;
     }
@@ -4869,6 +4868,10 @@ transcode_loop:
         if (stdin_interaction)
             if (check_keyboard_interaction(cur_time) < 0)
                 break;
+
+        if (wasm_config->stopped) {
+            exit(1);
+        }
 
         /* check if there's any stream where output is still needed */
         if (!need_output()) {
@@ -5079,11 +5082,10 @@ int main(int argc, char **argv)
     BenchmarkTimeStamps ti;
 
     wasm_config = malloc(sizeof(WasmGlobalConfig));
-    // wasm_config->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
 
     init_dynload();
 
-    register_exit(ffmpeg_cleanup);
+    // register_exit(ffmpeg_cleanup);
 
     setvbuf(stderr,NULL,_IONBF,0); /* win32 runtime needs this */
 

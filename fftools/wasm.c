@@ -1,6 +1,7 @@
 #include "wasm.h"
 #include "cJSON.h"
 #include "libavutil/avassert.h"
+#include "libavformat/movenc.h"
 
 // WasmGlobalConfig *wasm_config = malloc(sizeof(WasmGlobalConfig));
 WasmGlobalConfig *wasm_config;
@@ -9,6 +10,13 @@ EMSCRIPTEN_KEEPALIVE
 int wasm_do_seek(double target)
 {
     wasm_config->seek_target = target;
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int wasm_shutdown()
+{
+    wasm_config->stopped = 1;
     return 0;
 }
 
@@ -113,6 +121,7 @@ void wasm_report_moof_mdat_info(double from_seconds, double to_seconds, int moof
     ADD_KV_TO_CJSON_OBJECT(Number, entry, mdat_size, mdat_size);
 
     result = cJSON_PrintUnformatted(entry);
+    printf("%s\n", result);
 
 end:
     cJSON_Delete(entry);
@@ -140,5 +149,23 @@ void wasm_initial_seek(InputStream *ist, AVFormatContext *is)
 
     wasm_config->initial_seeked_done = 1;
     ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, AVSEEK_FLAG_BACKWARD);
+    
+    // does not work currently, mov->tracks is nullptr, why?
+    /*
+    // clear movenc internal buffer
+    {
+        MOVMuxContext *mov = is->priv_data;
+        int i;
+
+        for (i = 0; i < mov->nb_streams; i++)
+        {
+            MOVTrack *track = &mov->tracks[i];
+            track->entry = 0;
+            track->entries_flushed = 0;
+            track->end_reliable = 0;
+            track->mdat_buf = NULL;
+        }
+    }
+    */
     printf("avformat_seek to seconds %f, ts %lld, ret: %d\n", wasm_config->seek_target, seek_target_ts, ret);
 }

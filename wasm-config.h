@@ -16,6 +16,8 @@ typedef struct WasmGlobalConfig
     // if video meta info is reported
     int flag_meta_info_reported;
 
+    int stopped;
+
     wasm_report_moof_mdat_info_func wasm_report_moof_mdat_info;
 } WasmGlobalConfig;
 
