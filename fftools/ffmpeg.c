@@ -878,13 +878,13 @@ static void write_packet(OutputFile *of, AVPacket *pkt, OutputStream *ost, int u
 
 static void close_output_stream(OutputStream *ost)
 {
-    OutputFile *of = output_files[ost->file_index];
+    // OutputFile *of = output_files[ost->file_index];
 
-    ost->finished |= ENCODER_FINISHED;
-    if (of->shortest) {
-        int64_t end = av_rescale_q(ost->sync_opts - ost->first_pts, ost->enc_ctx->time_base, AV_TIME_BASE_Q);
-        of->recording_time = FFMIN(of->recording_time, end);
-    }
+    // ost->finished |= ENCODER_FINISHED;
+    // if (of->shortest) {
+    //     int64_t end = av_rescale_q(ost->sync_opts - ost->first_pts, ost->enc_ctx->time_base, AV_TIME_BASE_Q);
+    //     of->recording_time = FFMIN(of->recording_time, end);
+    // }
 }
 
 /*
@@ -1486,15 +1486,15 @@ static void do_video_stats(OutputStream *ost, int frame_size)
 
 static void finish_output_stream(OutputStream *ost)
 {
-    OutputFile *of = output_files[ost->file_index];
-    int i;
+    // OutputFile *of = output_files[ost->file_index];
+    // int i;
 
-    ost->finished = ENCODER_FINISHED | MUXER_FINISHED;
+    // ost->finished = ENCODER_FINISHED | MUXER_FINISHED;
 
-    if (of->shortest) {
-        for (i = 0; i < of->ctx->nb_streams; i++)
-            output_streams[of->ost_index + i]->finished = ENCODER_FINISHED | MUXER_FINISHED;
-    }
+    // if (of->shortest) {
+    //     for (i = 0; i < of->ctx->nb_streams; i++)
+    //         output_streams[of->ost_index + i]->finished = ENCODER_FINISHED | MUXER_FINISHED;
+    // }
 }
 
 /**
@@ -4360,7 +4360,19 @@ static int process_input(int file_index)
 
     is  = ifile->ctx;
     ret = get_input_packet(ifile, &pkt);
-
+// 
+//     // input is drained to eof
+//     // in case of files/streams internal status being closed or modified,
+//     // we stop here right now.
+//     if (ret < 0) {
+//         av_write_trailer(is);
+//         if (wasm_pause_decode(0, 1 /* is_eof */)) {
+//           printf("seeking back, exit program\n");
+//           exit(1);
+//           // abort();
+//         }
+//     }
+// 
     if (ret == AVERROR(EAGAIN)) {
         ifile->eagain = 1;
         return ret;
@@ -4420,7 +4432,7 @@ static int process_input(int file_index)
             }
         }
 
-        ifile->eof_reached = 1;
+        // ifile->eof_reached = 1;
         return AVERROR(EAGAIN);
     }
 
@@ -4779,9 +4791,10 @@ static int transcode_step(void)
 
     ret = process_input(ist->file_index);
     if (ret == AVERROR(EAGAIN)) {
-        if (input_files[ist->file_index]->eagain)
-            ost->unavailable = 1;
-        return 0;
+        // if (input_files[ist->file_index]->eagain)
+        //     ost->unavailable = 1;
+        // return 0;
+        return -1234;
     }
 
     if (ret < 0)
@@ -4864,6 +4877,9 @@ transcode_loop:
         }
 
         ret = transcode_step();
+        if (ret == -1234) {
+            break;
+        }
         if (ret < 0 && ret != AVERROR_EOF) {
             av_log(NULL, AV_LOG_ERROR, "Error while filtering: %s\n", av_err2str(ret));
             break;
@@ -4883,7 +4899,17 @@ transcode_loop:
             process_input_packet(ist, NULL, 0);
         }
     }
-    flush_encoders();
+    // flush_encoders();
+
+    for (i = 0; i < nb_output_files; i++) {
+        os = output_files[i]->ctx;
+        av_write_trailer_without_closing(os);
+    }
+    if (wasm_pause_decode(0, 1 /* is_eof */)) {
+      printf("seeking back, exit program\n");
+      exit(1);
+      // abort();
+    }
 
     // term_exit();
 
@@ -4907,7 +4933,6 @@ transcode_loop:
       printf("seeking back, exit program\n");
       exit(1);
       // abort();
-      // return 1;
     }
     exit(1);
     // goto transcode_loop;

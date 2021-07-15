@@ -1233,6 +1233,51 @@ int av_interleaved_write_frame(AVFormatContext *s, AVPacket *pkt)
     }
 }
 
+int av_write_trailer_without_closing(AVFormatContext *s)
+{
+    int i, ret1, ret = 0;
+    AVPacket *pkt = s->internal->pkt;
+
+    av_packet_unref(pkt);
+    for (i = 0; i < s->nb_streams; i++) {
+        if (s->streams[i]->internal->bsfc) {
+            ret1 = write_packets_from_bsfs(s, s->streams[i], pkt, 1/*interleaved*/);
+            if (ret1 < 0)
+                av_packet_unref(pkt);
+            if (ret >= 0)
+                ret = ret1;
+        }
+    }
+    ret1 = interleaved_write_packet(s, NULL, 1);
+    if (ret >= 0)
+        ret = ret1;
+
+    if (s->oformat->write_trailer) {
+        if (!(s->oformat->flags & AVFMT_NOFILE) && s->pb)
+            avio_write_marker(s->pb, AV_NOPTS_VALUE, AVIO_DATA_MARKER_TRAILER);
+        if (ret >= 0) {
+        ret = s->oformat->write_trailer(s);
+        } else {
+            s->oformat->write_trailer(s);
+        }
+    }
+
+    // deinit_muxer(s);
+
+    if (s->pb)
+       avio_flush(s->pb);
+    if (ret == 0)
+       ret = s->pb ? s->pb->error : 0;
+    // for (i = 0; i < s->nb_streams; i++) {
+    //     av_freep(&s->streams[i]->priv_data);
+    //     av_freep(&s->streams[i]->internal->index_entries);
+    // }
+    // if (s->oformat->priv_class)
+    //     av_opt_free(s->priv_data);
+    // av_freep(&s->priv_data);
+    return ret;
+}
+
 int av_write_trailer(AVFormatContext *s)
 {
     int i, ret1, ret = 0;

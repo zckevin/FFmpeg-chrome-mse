@@ -2353,6 +2353,7 @@ int av_write_uncoded_frame_query(AVFormatContext *s, int stream_index);
  * @return 0 if OK, AVERROR_xxx on error
  */
 int av_write_trailer(AVFormatContext *s);
+int av_write_trailer_without_closing(AVFormatContext *s);
 
 /**
  * Return the output format in the list of registered output formats
