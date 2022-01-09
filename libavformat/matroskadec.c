@@ -44,6 +44,7 @@
 #include "libavutil/opt.h"
 #include "libavutil/time_internal.h"
 #include "libavutil/spherical.h"
+#include "libavformat/rmsipr.c"
 
 #include "libavcodec/bytestream.h"
 #include "libavcodec/flac.h"

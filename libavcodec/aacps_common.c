@@ -25,6 +25,7 @@
 #include "aacps.h"
 #include "get_bits.h"
 #include "aacpsdata.c"
+#include "libavutil/log2_tab.c"
 
 static const int8_t num_env_tab[2][4] = {
     { 0, 1, 2, 4, },
