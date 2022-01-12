@@ -100,3 +100,59 @@ end:
     cJSON_Delete(entry);
     wasm_js_msg_callback("meta_info", result ? result : "{}");
 }
+
+EMSCRIPTEN_KEEPALIVE
+int wasm_set_seek_target(double target)
+{
+    wasm_config->seek_target = target;
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int wasm_stop()
+{
+    wasm_config->stopped = 1;
+    return 0;
+}
+
+int almost_equal(double a, double b)
+{
+    return FFABS(a - b) < 0.001;
+}
+
+void wasm_initial_seek(InputStream *ist, AVFormatContext *is)
+{
+    if (wasm_config->initial_seeked_done == 1 || almost_equal(wasm_config->seek_target, 0))
+    {
+        return;
+    }
+    // if (ist->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && !wasm_almost_equal(wasm_config->seek_target, -1))
+    int ret;
+    int64_t target_number = (int64_t)wasm_config->seek_target;
+    int64_t target_decimal = (int64_t)((wasm_config->seek_target - (double)target_number) * 10);
+
+    int64_t seek_target_ts = av_rescale_q(target_number * AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) +
+                             av_rescale_q(target_decimal * AV_TIME_BASE, AV_TIME_BASE_Q, ist->st->time_base) / 10;
+
+    wasm_config->initial_seeked_done = 1;
+    ret = avformat_seek_file(is, ist->st->index, INT64_MIN, seek_target_ts, seek_target_ts, AVSEEK_FLAG_BACKWARD);
+    
+    // does not work currently, mov->tracks is nullptr, why?
+    /*
+    // clear movenc internal buffer
+    {
+        MOVMuxContext *mov = is->priv_data;
+        int i;
+
+        for (i = 0; i < mov->nb_streams; i++)
+        {
+            MOVTrack *track = &mov->tracks[i];
+            track->entry = 0;
+            track->entries_flushed = 0;
+            track->end_reliable = 0;
+            track->mdat_buf = NULL;
+        }
+    }
+    */
+    printf("avformat_seek to seconds %f, ts %lld, ret: %d\n", wasm_config->seek_target, seek_target_ts, ret);
+}

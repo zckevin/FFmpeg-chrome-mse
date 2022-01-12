@@ -881,13 +881,14 @@ static void write_packet(OutputFile *of, AVPacket *pkt, OutputStream *ost, int u
 
 static void close_output_stream(OutputStream *ost)
 {
-    OutputFile *of = output_files[ost->file_index];
+    /* WASM_MSE_PLAYER */
+    // OutputFile *of = output_files[ost->file_index];
 
-    ost->finished |= ENCODER_FINISHED;
-    if (of->shortest) {
-        int64_t end = av_rescale_q(ost->sync_opts - ost->first_pts, ost->enc_ctx->time_base, AV_TIME_BASE_Q);
-        of->recording_time = FFMIN(of->recording_time, end);
-    }
+    // ost->finished |= ENCODER_FINISHED;
+    // if (of->shortest) {
+    //     int64_t end = av_rescale_q(ost->sync_opts - ost->first_pts, ost->enc_ctx->time_base, AV_TIME_BASE_Q);
+    //     of->recording_time = FFMIN(of->recording_time, end);
+    // }
 }
 
 /*
@@ -1489,15 +1490,16 @@ static void do_video_stats(OutputStream *ost, int frame_size)
 
 static void finish_output_stream(OutputStream *ost)
 {
-    OutputFile *of = output_files[ost->file_index];
-    int i;
+    /* WASM_MSE_PLAYER */
+    // OutputFile *of = output_files[ost->file_index];
+    // int i;
 
-    ost->finished = ENCODER_FINISHED | MUXER_FINISHED;
+    // ost->finished = ENCODER_FINISHED | MUXER_FINISHED;
 
-    if (of->shortest) {
-        for (i = 0; i < of->ctx->nb_streams; i++)
-            output_streams[of->ost_index + i]->finished = ENCODER_FINISHED | MUXER_FINISHED;
-    }
+    // if (of->shortest) {
+    //     for (i = 0; i < of->ctx->nb_streams; i++)
+    //         output_streams[of->ost_index + i]->finished = ENCODER_FINISHED | MUXER_FINISHED;
+    // }
 }
 
 /**
@@ -4351,6 +4353,10 @@ static int seek_to_start(InputFile *ifile, AVFormatContext *is)
  */
 static int process_input(int file_index)
 {
+#ifdef WASM_MSE_PLAYER
+    static int wasm_pause_counter = 0;
+#endif
+
     InputFile *ifile = input_files[file_index];
     AVFormatContext *is;
     InputStream *ist;
@@ -4422,7 +4428,8 @@ static int process_input(int file_index)
             }
         }
 
-        ifile->eof_reached = 1;
+        /* WASM_MSE_PLAYER */
+        // ifile->eof_reached = 1;
         return AVERROR(EAGAIN);
     }
 
@@ -4619,6 +4626,20 @@ static int process_input(int file_index)
                av_ts2str(input_files[ist->file_index]->ts_offset),
                av_ts2timestr(input_files[ist->file_index]->ts_offset, &AV_TIME_BASE_Q));
     }
+
+#ifdef WASM_MSE_PLAYER
+    if (ist->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        wasm_initial_seek(ist, is);
+
+        if (++wasm_pause_counter >= 10) {
+            wasm_pause_counter = 0;
+            if (wasm_js_pause_decode(pkt->pts * av_q2d(ist->st->time_base), 0)) {
+              printf("seeking back, exit program\n");
+              abort();
+            }
+        }
+    }
+#endif
 
     sub2video_heartbeat(ist, pkt->pts);
 
@@ -4991,7 +5012,7 @@ static int wasm_transcode_first_part(void)
       }
     }
   }
-  // wasm_sleep();
+  wasm_js_do_snapshot();
 #endif
   return wasm_transcode_second_part();
 }
@@ -5079,11 +5100,11 @@ transcode_loop:
     }
 
 #ifdef WASM_MSE_PLAYER
-    // if (wasm_pause_decode(0, 1 /* is_eof */)) {
-    //   printf("seeking back, exit program\n");
-    //   exit(1);
-    //   // abort();
-    // }
+    if (wasm_js_pause_decode(0, 1 /* is_eof */)) {
+      printf("seeking back, exit program\n");
+      // exit(0);
+      abort();
+    }
 #endif
 
     /* write the trailer if needed and close file */
@@ -5103,10 +5124,11 @@ transcode_loop:
         }
     }
 #ifdef WASM_MSE_PLAYER
-    // if (wasm_pause_decode(0, 1 /* is_eof */)) {
-    //     printf("seeking back, exit program\n");
-    // }
-    exit(1);
+    if (wasm_js_pause_decode(0, 1 /* is_eof */)) {
+        printf("seeking back, exit program\n");
+    }
+    // exit(0);
+    abort();
 #endif
 
  fail:
