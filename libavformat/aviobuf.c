@@ -1341,6 +1341,10 @@ static int url_open_dyn_buf_internal(AVIOContext **s, int max_packet_size)
 {
     DynBuffer *d;
     unsigned io_buffer_size = max_packet_size ? max_packet_size : 1024;
+    /* WASM_MSE_PLAYER */
+    // io_buffer_size is the initial buffer size of the avio context,
+    // should be larger than (2x here) mov flag -frag_size used in ffmpeg cmdline
+    io_buffer_size = 1024 * 1024 * 2;
 
     if (sizeof(DynBuffer) + io_buffer_size < io_buffer_size)
         return AVERROR(ERANGE);

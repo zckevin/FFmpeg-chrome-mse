@@ -38,6 +38,10 @@
 #include "os_support.h"
 #include "url.h"
 
+#ifdef WASM_MSE_PLAYER
+#include "wasm/wasm.h"
+#endif
+
 /* Some systems may not have S_ISFIFO */
 #ifndef S_ISFIFO
 #  ifdef S_IFIFO
@@ -112,6 +116,9 @@ static int file_read(URLContext *h, unsigned char *buf, int size)
     int ret;
     size = FFMIN(size, c->blocksize);
     ret = read(c->fd, buf, size);
+#ifdef WASM_MSE_PLAYER
+    ret = wasm_js_wait_read_result();
+#endif
     if (ret == 0 && c->follow)
         return AVERROR(EAGAIN);
     if (ret == 0)
@@ -239,6 +246,8 @@ static int file_open(URLContext *h, const char *filename, int flags)
      * with networked file systems */
     if (!h->is_streamed && flags & AVIO_FLAG_WRITE)
         h->min_packet_size = h->max_packet_size = 262144;
+    /* WASM_MSE_PLAYER */
+    h->min_packet_size = h->max_packet_size = 2097152; // 2 MiB
 
     if (c->seekable >= 0)
         h->is_streamed = !c->seekable;

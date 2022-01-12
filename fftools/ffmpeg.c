@@ -106,6 +106,13 @@
 
 #include "libavutil/avassert.h"
 
+#ifdef WASM_MSE_PLAYER
+#include "wasm/wasm.h"
+extern WasmGlobalConfig *wasm_config;
+#endif
+
+int wasm_transcode_second_part(void);
+
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
 
@@ -4757,6 +4764,8 @@ static int transcode_step(void)
 
     ret = process_input(ist->file_index);
     if (ret == AVERROR(EAGAIN)) {
+        /* WASM_MSE_PLAYER */
+        return -42;
         if (input_files[ist->file_index]->eagain)
             ost->unavailable = 1;
         return 0;
@@ -4963,8 +4972,179 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
+static int wasm_transcode_first_part(void)
+{
+  int ret;
+  ret = transcode_init();
+  if (ret < 0) {
+    printf("trancode_first_part failed!");
+    return ret;
+  }
+#ifdef WASM_MSE_PLAYER
+  printf("trancode_first_part %d\n", wasm_config->flag_metainfo_uploaded);
+  if (!wasm_config->flag_metainfo_uploaded) {
+    for (int i = 0; i < nb_input_streams; i++) {
+      if (input_streams[i]->st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        wasm_upload_metainfo(input_files[0]->ctx, input_streams[i]->st);
+        wasm_config->flag_metainfo_uploaded = 1;
+        break;
+      }
+    }
+  }
+  // wasm_sleep();
+#endif
+  return wasm_transcode_second_part();
+}
+
+#ifdef WASM_MSE_PLAYER
+EMSCRIPTEN_KEEPALIVE int wasm_transcode_second_part(void)
+#else
+int wasm_transcode_second_part(void)
+#endif
+{
+    int ret, i;
+    AVFormatContext *os;
+    OutputStream *ost;
+    InputStream *ist;
+    int64_t timer_start;
+    int64_t total_packets_written = 0;
+
+    // hook up wasm report function to be used in movenc.c
+    // for (i = 0; i < nb_output_files; i++) {
+    //     os = output_files[i]->ctx;
+    //     os->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
+    //     os = NULL;
+    // }
+
+    if (stdin_interaction) {
+        av_log(NULL, AV_LOG_INFO, "Press [q] to stop, [?] for help\n");
+    }
+
+    timer_start = av_gettime_relative();
+
+#if HAVE_THREADS
+    if ((ret = init_input_threads()) < 0)
+        goto fail;
+#endif
+
+transcode_loop:
+    while (!received_sigterm) {
+        int64_t cur_time= av_gettime_relative();
+
+        /* if 'q' pressed, exits */
+        if (stdin_interaction)
+            if (check_keyboard_interaction(cur_time) < 0)
+                break;
+
+#ifdef WASM_MSE_PLAYER
+        if (wasm_config->stopped) {
+            exit(1);
+        }
+#endif
+
+        /* check if there's any stream where output is still needed */
+        if (!need_output()) {
+            av_log(NULL, AV_LOG_VERBOSE, "No more output streams to write to, finishing.\n");
+            break;
+        }
+
+        ret = transcode_step();
+        if (ret == -42) {
+            break;
+        }
+        if (ret < 0 && ret != AVERROR_EOF) {
+            av_log(NULL, AV_LOG_ERROR, "Error while filtering: %s\n", av_err2str(ret));
+            break;
+        }
+
+        /* dump report by using the output first video and audio streams */
+        print_report(0, timer_start, cur_time);
+    }
+#if HAVE_THREADS
+    // free_input_threads();
+#endif
+
+    /* at the end of stream, we must flush the decoder buffers */
+    for (i = 0; i < nb_input_streams; i++) {
+        ist = input_streams[i];
+        if (!input_files[ist->file_index]->eof_reached) {
+            process_input_packet(ist, NULL, 0);
+        }
+    }
+    // flush_encoders();
+
+    for (i = 0; i < nb_output_files; i++) {
+        os = output_files[i]->ctx;
+        wasm_av_write_trailer_without_closing(os);
+    }
+
+#ifdef WASM_MSE_PLAYER
+    // if (wasm_pause_decode(0, 1 /* is_eof */)) {
+    //   printf("seeking back, exit program\n");
+    //   exit(1);
+    //   // abort();
+    // }
+#endif
+
+    /* write the trailer if needed and close file */
+    for (i = 0; i < nb_output_files; i++) {
+        os = output_files[i]->ctx;
+        if (!output_files[i]->header_written) {
+            av_log(NULL, AV_LOG_ERROR,
+                   "Nothing was written into output file %d (%s), because "
+                   "at least one of its streams received no packets.\n",
+                   i, os->url);
+            continue;
+        }
+        if ((ret = av_write_trailer(os)) < 0) {
+            av_log(NULL, AV_LOG_ERROR, "Error writing trailer of %s: %s\n", os->url, av_err2str(ret));
+            // if (exit_on_error)
+            //     exit_program(1);
+        }
+    }
+#ifdef WASM_MSE_PLAYER
+    // if (wasm_pause_decode(0, 1 /* is_eof */)) {
+    //     printf("seeking back, exit program\n");
+    // }
+    exit(1);
+#endif
+
+ fail:
+#if HAVE_THREADS
+    free_input_threads();
+#endif
+
+    if (output_streams) {
+        for (i = 0; i < nb_output_streams; i++) {
+            ost = output_streams[i];
+            if (ost) {
+                if (ost->logfile) {
+                    if (fclose(ost->logfile))
+                        av_log(NULL, AV_LOG_ERROR,
+                               "Error closing logfile, loss of information possible: %s\n",
+                               av_err2str(AVERROR(errno)));
+                    ost->logfile = NULL;
+                }
+                av_freep(&ost->forced_kf_pts);
+                av_freep(&ost->apad);
+                av_freep(&ost->disposition);
+                av_dict_free(&ost->encoder_opts);
+                av_dict_free(&ost->sws_dict);
+                av_dict_free(&ost->swr_opts);
+                av_dict_free(&ost->resample_opts);
+            }
+        }
+    }
+    return ret;
+}
+
+
 int main(int argc, char **argv)
 {
+#ifdef WASM_MSE_PLAYER
+    wasm_config = malloc(sizeof(WasmGlobalConfig));
+#endif
+
     int i, ret;
     BenchmarkTimeStamps ti;
 
@@ -5014,7 +5194,9 @@ int main(int argc, char **argv)
     }
 
     current_time = ti = get_benchmark_time_stamps();
-    if (transcode() < 0)
+    /* WASM_MSE_PLAYER */
+    // if (transcode() < 0)
+    if (wasm_transcode_first_part() < 0)
         exit_program(1);
     if (do_benchmark) {
         int64_t utime, stime, rtime;
