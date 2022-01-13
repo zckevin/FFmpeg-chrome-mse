@@ -5030,12 +5030,15 @@ int wasm_transcode_second_part(void)
     int64_t timer_start;
     int64_t total_packets_written = 0;
 
-    // hook up wasm report function to be used in movenc.c
-    // for (i = 0; i < nb_output_files; i++) {
-    //     os = output_files[i]->ctx;
-    //     os->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
-    //     os = NULL;
-    // }
+#ifdef WASM_MSE_PLAYER
+    // Libavformat & ffmpeg are two different libraries/processes, so we need to
+    // pass the function pointer from ffmpeg -> libavformat
+    for (i = 0; i < nb_output_files; i++) {
+        os = output_files[i]->ctx;
+        os->wasm_report_moof_mdat_info = wasm_report_moof_mdat_info;
+        os = NULL;
+    }
+#endif
 
     if (stdin_interaction) {
         av_log(NULL, AV_LOG_INFO, "Press [q] to stop, [?] for help\n");

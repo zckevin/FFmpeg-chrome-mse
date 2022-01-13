@@ -4827,7 +4827,8 @@ static int mov_write_prft_tag(AVIOContext *pb, MOVMuxContext *mov, int tracks)
     return update_size(pb, pos);
 }
 
-static int mov_write_moof_tag(AVIOContext *pb, MOVMuxContext *mov, int tracks,
+/* WASM_MSE_PLAYER */
+static int mov_write_moof_tag(AVFormatContext *s, MOVMuxContext *mov, int tracks,
                               int64_t mdat_size)
 {
     AVIOContext *avio_buf;
@@ -4837,6 +4838,31 @@ static int mov_write_moof_tag(AVIOContext *pb, MOVMuxContext *mov, int tracks,
         return ret;
     mov_write_moof_tag_internal(avio_buf, mov, tracks, 0);
     moof_size = ffio_close_null_buf(avio_buf);
+
+#ifdef WASM_MSE_PLAYER
+{
+     // emit moof data point
+    int i;
+    for (i = 0; i < mov->nb_streams; i++) {
+      MOVTrack *track = &mov->tracks[i];
+      if (track->par->codec_type == AVMEDIA_TYPE_VIDEO) {
+        int64_t start_dts = track->frag_start;
+        int64_t end_dts = track->track_duration;
+
+        double start_seconds = (double)start_dts / (double)track->timescale;
+        double end_seconds = (double)end_dts / (double)track->timescale;
+        printf("emit moof+mdat, dts: %lld-%lld, seconds: %f-%f, moof size: %lld, mdat size: %lld\n",
+            start_dts, end_dts,
+            start_seconds, end_seconds,
+            moof_size, mdat_size + 8);
+
+        s->wasm_report_moof_mdat_info(start_seconds, end_seconds, moof_size, mdat_size + 8);
+        break;
+      }
+    }   
+}
+#endif
+    AVIOContext *pb = s->pb;
 
     if (mov->flags & FF_MOV_FLAG_DASH &&
         !(mov->flags & (FF_MOV_FLAG_GLOBAL_SIDX | FF_MOV_FLAG_SKIP_SIDX)))
@@ -5444,7 +5470,9 @@ static int mov_flush_fragment(AVFormatContext *s, int force)
         if (write_moof) {
             avio_write_marker(s->pb, AV_NOPTS_VALUE, AVIO_DATA_MARKER_FLUSH_POINT);
 
-            mov_write_moof_tag(s->pb, mov, moof_tracks, mdat_size);
+            /* WASM_MSE_PLAYER */
+            // mov_write_moof_tag(s->pb, mov, moof_tracks, mdat_size);
+            mov_write_moof_tag(s, mov, moof_tracks, mdat_size);
             mov->fragments++;
 
             avio_wb32(s->pb, mdat_size + 8);

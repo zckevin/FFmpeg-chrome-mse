@@ -27,7 +27,7 @@ void wasm_report_moof_mdat_info(double from_seconds, double to_seconds, int moof
 
 end:
     cJSON_Delete(entry);
-    wasm_js_msg_callback("moof_mdat", result ? result : "{}");
+    wasm_js_msg_callback("fragment_info", result ? result : "{}");
 }
 
 int get_avc1_codec_mime(AVStream *stream, char *codec)
@@ -39,7 +39,7 @@ int get_avc1_codec_mime(AVStream *stream, char *codec)
 
     if (par->codec_id != AV_CODEC_ID_H264)
     {
-        wasm_js_msg_callback("error", "{reason: \"video codec not h264\"}");
+        wasm_js_msg_callback("error", "{\"reason\": \"video codec not h264\"}");
         exit_program(1);
     }
 

@@ -1696,6 +1696,10 @@ typedef struct AVFormatContext {
      * - decoding: set by user
      */
     int max_probe_packets;
+
+#ifdef WASM_MSE_PLAYER
+    void (*wasm_report_moof_mdat_info)(double, double, int, int);
+#endif
 } AVFormatContext;
 
 /**
