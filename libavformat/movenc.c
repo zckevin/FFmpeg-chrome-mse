@@ -4851,7 +4851,7 @@ static int mov_write_moof_tag(AVFormatContext *s, MOVMuxContext *mov, int tracks
 
         double start_seconds = (double)start_dts / (double)track->timescale;
         double end_seconds = (double)end_dts / (double)track->timescale;
-        printf("emit moof+mdat, dts: %lld-%lld, seconds: %f-%f, moof size: %lld, mdat size: %lld\n",
+        printf("emit moof+mdat, dts: %lld-%lld, seconds: %f-%f, moof size: %d, mdat size: %d\n",
             start_dts, end_dts,
             start_seconds, end_seconds,
             moof_size, mdat_size + 8);
