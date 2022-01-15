@@ -22,7 +22,7 @@ extern int wasm_js_wait_read_result();
 extern int wasm_js_do_snapshot();
 extern int wasm_js_has_seeked();
 extern int wasm_js_msg_callback(const char* name, const char* msg);
-extern int wasm_js_pause_decode(double pkt_pts_seconds, int is_eof);
+extern int wasm_js_pause_decode(int wasm_instance_id, double pkt_pts_seconds, int is_eof);
 
 #define ADD_KV_TO_CJSON_OBJECT(type, obj, key, value)          \
     do                                                         \

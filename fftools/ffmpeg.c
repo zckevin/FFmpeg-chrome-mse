@@ -111,7 +111,8 @@
 extern WasmGlobalConfig *wasm_config;
 #endif
 
-int wasm_transcode_second_part(void);
+static int wasm_instance_id = 0;
+int wasm_transcode_second_part(int);
 
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
@@ -4633,7 +4634,7 @@ static int process_input(int file_index)
 
         if (++wasm_pause_counter >= 10) {
             wasm_pause_counter = 0;
-            if (wasm_js_pause_decode(pkt->pts * av_q2d(ist->st->time_base), 0)) {
+            if (wasm_js_pause_decode(wasm_instance_id, pkt->pts * av_q2d(ist->st->time_base), 0)) {
               printf("seeking back, exit program\n");
               abort();
             }
@@ -5014,13 +5015,13 @@ static int wasm_transcode_first_part(void)
   }
   wasm_js_do_snapshot();
 #endif
-  return wasm_transcode_second_part();
+  return wasm_transcode_second_part(0);
 }
 
 #ifdef WASM_MSE_PLAYER
-EMSCRIPTEN_KEEPALIVE int wasm_transcode_second_part(void)
+EMSCRIPTEN_KEEPALIVE int wasm_transcode_second_part(int instance_id)
 #else
-int wasm_transcode_second_part(void)
+int wasm_transcode_second_part(int instance_id)
 #endif
 {
     int ret, i;
@@ -5029,6 +5030,9 @@ int wasm_transcode_second_part(void)
     InputStream *ist;
     int64_t timer_start;
     int64_t total_packets_written = 0;
+
+    /* WASM_MSE_PLAYER */
+    wasm_instance_id = instance_id;
 
 #ifdef WASM_MSE_PLAYER
     // Libavformat & ffmpeg are two different libraries/processes, so we need to
@@ -5103,7 +5107,7 @@ transcode_loop:
     }
 
 #ifdef WASM_MSE_PLAYER
-    if (wasm_js_pause_decode(0, 1 /* is_eof */)) {
+    if (wasm_js_pause_decode(wasm_instance_id, 0, 1 /* is_eof */)) {
       printf("seeking back, exit program\n");
       // exit(0);
       abort();
@@ -5127,7 +5131,7 @@ transcode_loop:
         }
     }
 #ifdef WASM_MSE_PLAYER
-    if (wasm_js_pause_decode(0, 1 /* is_eof */)) {
+    if (wasm_js_pause_decode(wasm_instance_id, 0, 1 /* is_eof */)) {
         printf("seeking back, exit program\n");
     }
     // exit(0);
