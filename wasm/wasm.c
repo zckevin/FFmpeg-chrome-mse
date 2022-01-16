@@ -37,6 +37,11 @@ int get_avc1_codec_mime(AVStream *stream, char *codec)
     AVCodecParameters *par = stream->codecpar;
     int constraint = 0;
 
+    if (par->codec_id == AV_CODEC_ID_HEVC)
+    {
+        return sprintf(codec, "hev1.1.6.L93.B0");
+    }
+
     if (par->codec_id != AV_CODEC_ID_H264)
     {
         wasm_js_msg_callback("error", "{\"reason\": \"video codec not h264\"}");
